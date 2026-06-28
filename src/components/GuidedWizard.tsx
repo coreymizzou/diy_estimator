@@ -3,6 +3,7 @@ import { CheckCircle2, HelpCircle } from 'lucide-react';
 import type { Scenario, MaturityPreset } from '../data/types';
 import { Card, Field, NumberInput } from './ui';
 import { computeEstimate, formatCurrency } from '../lib/calculations';
+import { MIGRATION_FTE_MONTHS } from '../data/benchmarks';
 
 interface GuidedWizardProps {
   scenario: Scenario;
@@ -65,6 +66,16 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
   const p = scenario.profile;
   const set = <K extends keyof typeof p>(key: K, value: (typeof p)[K]) =>
     onChange(s => ({ ...s, profile: { ...s.profile, [key]: value } }));
+
+  // The guided migration-complexity answer and the advanced editor's migration cost inputs
+  // share one underlying cost driver — keep them in sync so this answer actually changes
+  // the estimate instead of only updating a copy that calculations.ts never reads.
+  const setMigrationComplexity = (v: typeof p.migrationComplexity) =>
+    onChange(s => ({
+      ...s,
+      profile: { ...s.profile, migrationComplexity: v },
+      migration: { ...s.migration, complexity: v, fteMonths: { ...MIGRATION_FTE_MONTHS[v] } },
+    }));
 
   const toggleUnsure = (field: string, v: boolean) => {
     setUnsureFields(prev => {
@@ -232,7 +243,7 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
             options={['Minimal', 'Simple', 'Moderate', 'Complex'] as const}
             value={p.migrationComplexity}
             moderateValue="Moderate"
-            onChange={v => set('migrationComplexity', v)}
+            onChange={setMigrationComplexity}
             unsure={unsureFields.has('migrationComplexity')}
             onUnsureChange={v => toggleUnsure('migrationComplexity', v)}
           />

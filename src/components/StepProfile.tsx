@@ -1,10 +1,21 @@
 import type { Scenario } from '../data/types';
 import { Card, Field, TextInput, NumberInput, Select, Checkbox } from './ui';
+import { MIGRATION_FTE_MONTHS } from '../data/benchmarks';
 
 export default function StepProfile({ scenario, onChange }: { scenario: Scenario; onChange: (updater: (s: Scenario) => Scenario) => void }) {
   const p = scenario.profile;
   const set = <K extends keyof typeof p>(key: K, value: (typeof p)[K]) =>
     onChange(s => ({ ...s, profile: { ...s.profile, [key]: value } }));
+
+  // The profile's migration-complexity question and the advanced editor's migration cost
+  // inputs share one underlying cost driver — keep them in sync so the guided answer
+  // actually changes the estimate instead of only updating a copy that nothing reads.
+  const setMigrationComplexity = (v: typeof p.migrationComplexity) =>
+    onChange(s => ({
+      ...s,
+      profile: { ...s.profile, migrationComplexity: v },
+      migration: { ...s.migration, complexity: v, fteMonths: { ...MIGRATION_FTE_MONTHS[v] } },
+    }));
 
   return (
     <div className="space-y-4">
@@ -78,7 +89,7 @@ export default function StepProfile({ scenario, onChange }: { scenario: Scenario
             <Select value={p.availability} onChange={v => set('availability', v as any)} options={['Standard', 'High availability', 'Mission critical']} />
           </Field>
           <Field label="Migration complexity">
-            <Select value={p.migrationComplexity} onChange={v => set('migrationComplexity', v as any)} options={['Minimal', 'Simple', 'Moderate', 'Complex']} />
+            <Select value={p.migrationComplexity} onChange={v => setMigrationComplexity(v as any)} options={['Minimal', 'Simple', 'Moderate', 'Complex']} />
           </Field>
           <Field label="Data volume" hint="Scales the Quick-mode cloud cost estimate (storage typically drives 25-40% of cloud spend).">
             <Select value={p.dataVolume} onChange={v => set('dataVolume', v as any)} options={['Low', 'Moderate', 'High', 'Custom']} />

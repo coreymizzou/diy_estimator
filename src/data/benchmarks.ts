@@ -159,6 +159,36 @@ export const TOOLING_LIST = [
   'Confluence or equivalent', 'Mattermost or equivalent', 'Monitoring and logging tools',
 ];
 
+// HA/mission-critical environments require multi-AZ or multi-region redundancy (extra compute
+// and storage replicas, cross-AZ data transfer, additional load balancers). AWS's Well-Architected
+// reliability guidance and typical GovCloud HA architectures put multi-AZ overhead at roughly
+// 20-35% of base infrastructure cost, and full multi-region resilience at roughly 50-70%.
+export const AVAILABILITY_MULTIPLIERS: Record<'Standard' | 'High availability' | 'Mission critical', number> = {
+  Standard: 1.0,
+  'High availability': 1.3,
+  'Mission critical': 1.65,
+};
+
+// Higher DoD/agency impact levels require implementing and continuously monitoring more
+// NIST 800-53 controls and produce more authorization-package documentation, which scales
+// both cybersecurity engineering labor and the cost of the independent/3PAO assessment.
+export const CLASSIFICATION_CYBER_MULTIPLIERS: Record<'IL-2' | 'IL-4' | 'IL-5' | 'Other', number> = {
+  'IL-2': 1.0,
+  'IL-4': 1.3,
+  'IL-5': 1.6,
+  Other: 1.0,
+};
+
+// GitLab/Jira/Confluence/Mattermost (TOOLING_SOURCES) are all priced per seat. The tooling
+// benchmark ranges are calibrated to a ~25-seat team (developers + platform users combined),
+// matching the default Greenfield scenario, so license cost scales with headcount from there.
+export const TOOLING_BASELINE_SEATS = 25;
+
+// Compute/orchestration overhead (container count, CI/CD pipeline volume, service mesh routing)
+// scales with how many microservices are running. Quick-mode cloud ranges are calibrated to the
+// default Greenfield scenario's ~6-microservice baseline.
+export const MICROSERVICE_BASELINE = 6;
+
 export const MIGRATION_FTE_MONTHS: Record<'Minimal' | 'Simple' | 'Moderate' | 'Complex', RangeValue> = {
   Minimal: { low: 1, expected: 2, high: 4 },
   Simple: { low: 2, expected: 4, high: 8 },

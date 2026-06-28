@@ -3,7 +3,10 @@ import type {
 } from '../data/types';
 import { zeroRange } from '../data/types';
 import { LABOR_ROLES } from '../data/types';
-import { DATA_VOLUME_MULTIPLIERS, LOGGING_VOLUME_MULTIPLIERS } from '../data/benchmarks';
+import {
+  DATA_VOLUME_MULTIPLIERS, LOGGING_VOLUME_MULTIPLIERS, AVAILABILITY_MULTIPLIERS,
+  CLASSIFICATION_CYBER_MULTIPLIERS, TOOLING_BASELINE_SEATS, MICROSERVICE_BASELINE,
+} from '../data/benchmarks';
 
 export const addRange = (a: RangeValue, b: RangeValue): RangeValue => ({
   low: a.low + b.low,
@@ -46,11 +49,17 @@ function blendedAnnualRate(scenario: Scenario, roleId: LaborRoleId): RangeValue 
 export function laborAllocationCost(scenario: Scenario, alloc: LaborAllocation): RangeValue {
   const annualRate = blendedAnnualRate(scenario, alloc.roleId);
   const months = alloc.monthsAssigned / 12;
-  return {
+  const cost = {
     low: annualRate.low * alloc.fteLow * months,
     expected: annualRate.expected * alloc.fteExpected * months,
     high: annualRate.high * alloc.fteHigh * months,
   };
+  // Higher impact levels require more authorization/control-implementation effort from
+  // cybersecurity engineers specifically, not the rest of the team.
+  if (alloc.roleId === 'cyberEngineer') {
+    return scaleRange(cost, CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification]);
+  }
+  return cost;
 }
 
 export interface LaborSummaryRow {
@@ -91,12 +100,14 @@ export function extendedHoursMultiplier(scenario: Scenario): number {
 
 export function cloudAnnualCost(scenario: Scenario): RangeValue {
   if (scenario.cloud.mode === 'Quick') {
-    // Quick mode is a flat planning range, so data/logging volume are applied here as
-    // multipliers. Advanced mode is already itemized component-by-component, so applying
-    // the same multipliers there would double-count volume effects the user already priced in.
+    // Quick mode is a flat planning range, so volume/availability/service-count are applied
+    // here as multipliers. Advanced mode is already itemized component-by-component, so
+    // applying the same multipliers there would double-count effects already priced in.
     const dataFactor = DATA_VOLUME_MULTIPLIERS[scenario.profile.dataVolume];
     const loggingFactor = LOGGING_VOLUME_MULTIPLIERS[scenario.profile.loggingVolume];
-    return scaleRange(scenario.cloud.quickAnnual, dataFactor * loggingFactor);
+    const availabilityFactor = AVAILABILITY_MULTIPLIERS[scenario.profile.availability];
+    const microserviceFactor = Math.min(3, Math.max(0.5, scenario.profile.numMicroservices / MICROSERVICE_BASELINE));
+    return scaleRange(scenario.cloud.quickAnnual, dataFactor * loggingFactor * availabilityFactor * microserviceFactor);
   }
   return scenario.cloud.advancedComponents
     .filter(c => c.included)
@@ -104,7 +115,11 @@ export function cloudAnnualCost(scenario: Scenario): RangeValue {
 }
 
 export function toolingAnnualCost(scenario: Scenario): RangeValue {
-  return scenario.tooling.annualLicense;
+  // Per-seat tooling pricing (TOOLING_SOURCES) scales with headcount; the benchmark range
+  // is calibrated to a ~25-seat team, so scale it by actual developers + platform users.
+  const seats = scenario.profile.numDevelopers + scenario.profile.numPlatformUsers;
+  const seatFactor = Math.min(4, Math.max(0.4, seats / TOOLING_BASELINE_SEATS));
+  return scaleRange(scenario.tooling.annualLicense, seatFactor);
 }
 
 export function migrationCost(scenario: Scenario): RangeValue {
@@ -211,11 +226,13 @@ export function computeEstimate(scenario: Scenario): EstimateResult {
   byCostType.License = addRange(byCostType.License, toolingAnnual);
   treatmentBucket('New funding required', newCashVsCapacity, toolingAnnual);
 
-  // External assessment (initial, professional service) — only if enabled
+  // External assessment (initial, professional service) — only if enabled. Higher impact
+  // levels require a deeper 3PAO/independent assessment against more controls.
   if (scenario.externalAssessment.enabled) {
-    byCategory['Cybersecurity and authorization'].initial = addRange(byCategory['Cybersecurity and authorization'].initial, scenario.externalAssessment.amount);
-    byCostType['Professional service'] = addRange(byCostType['Professional service'], scenario.externalAssessment.amount);
-    treatmentBucket('New funding required', newCashVsCapacity, scenario.externalAssessment.amount);
+    const assessmentAmount = scaleRange(scenario.externalAssessment.amount, CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification]);
+    byCategory['Cybersecurity and authorization'].initial = addRange(byCategory['Cybersecurity and authorization'].initial, assessmentAmount);
+    byCostType['Professional service'] = addRange(byCostType['Professional service'], assessmentAmount);
+    treatmentBucket('New funding required', newCashVsCapacity, assessmentAmount);
   }
 
   // Migration (initial, labor-derived)
@@ -270,7 +287,7 @@ export function computeEstimate(scenario: Scenario): EstimateResult {
   }
   addBucket('New funding required', scaleRange(cloudAnnual, years));
   addBucket('New funding required', scaleRange(toolingAnnual, years));
-  if (scenario.externalAssessment.enabled) addBucket('New funding required', scenario.externalAssessment.amount);
+  if (scenario.externalAssessment.enabled) addBucket('New funding required', scaleRange(scenario.externalAssessment.amount, CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification]));
   addBucket('New funding required', migration);
   for (const item of scenario.costItems) {
     if (!item.included) continue;
