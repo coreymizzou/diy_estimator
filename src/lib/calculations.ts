@@ -6,7 +6,21 @@ import { LABOR_ROLES } from '../data/types';
 import {
   DATA_VOLUME_MULTIPLIERS, LOGGING_VOLUME_MULTIPLIERS, AVAILABILITY_MULTIPLIERS,
   CLASSIFICATION_CYBER_MULTIPLIERS, TOOLING_BASELINE_SEATS, MICROSERVICE_BASELINE,
+  END_USER_BASELINE, LABOR_FOOTPRINT_BASELINE, LABOR_FOOTPRINT_MIN, LABOR_FOOTPRINT_MAX,
 } from '../data/benchmarks';
+
+// Blends microservice/developer/platform-user counts against the labor benchmark's calibrated
+// baseline so a tiny pilot doesn't carry the same platform team as the default-sized scenario.
+function laborFootprintFactor(scenario: Scenario): number {
+  const b = LABOR_FOOTPRINT_BASELINE;
+  const p = scenario.profile;
+  const factor = (
+    p.numMicroservices / b.microservices +
+    p.numDevelopers / b.developers +
+    p.numPlatformUsers / b.platformUsers
+  ) / 3;
+  return Math.min(LABOR_FOOTPRINT_MAX, Math.max(LABOR_FOOTPRINT_MIN, factor));
+}
 
 export const addRange = (a: RangeValue, b: RangeValue): RangeValue => ({
   low: a.low + b.low,
@@ -54,12 +68,13 @@ export function laborAllocationCost(scenario: Scenario, alloc: LaborAllocation):
     expected: annualRate.expected * alloc.fteExpected * months,
     high: annualRate.high * alloc.fteHigh * months,
   };
+  const footprintScaled = scaleRange(cost, laborFootprintFactor(scenario));
   // Higher impact levels require more authorization/control-implementation effort from
   // cybersecurity engineers specifically, not the rest of the team.
   if (alloc.roleId === 'cyberEngineer') {
-    return scaleRange(cost, CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification]);
+    return scaleRange(footprintScaled, CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification]);
   }
-  return cost;
+  return footprintScaled;
 }
 
 export interface LaborSummaryRow {
@@ -107,7 +122,8 @@ export function cloudAnnualCost(scenario: Scenario): RangeValue {
     const loggingFactor = LOGGING_VOLUME_MULTIPLIERS[scenario.profile.loggingVolume];
     const availabilityFactor = AVAILABILITY_MULTIPLIERS[scenario.profile.availability];
     const microserviceFactor = Math.min(3, Math.max(0.5, scenario.profile.numMicroservices / MICROSERVICE_BASELINE));
-    return scaleRange(scenario.cloud.quickAnnual, dataFactor * loggingFactor * availabilityFactor * microserviceFactor);
+    const endUserFactor = Math.min(3, Math.max(0.5, scenario.profile.numEndUsers / END_USER_BASELINE));
+    return scaleRange(scenario.cloud.quickAnnual, dataFactor * loggingFactor * availabilityFactor * microserviceFactor * endUserFactor);
   }
   return scenario.cloud.advancedComponents
     .filter(c => c.included)

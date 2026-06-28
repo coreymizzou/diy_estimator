@@ -189,6 +189,20 @@ export const TOOLING_BASELINE_SEATS = 25;
 // default Greenfield scenario's ~6-microservice baseline.
 export const MICROSERVICE_BASELINE = 6;
 
+// End-user traffic (request volume, bandwidth, connection pooling) scales cloud compute/data
+// transfer cost independent of the build-side microservice count. Quick-mode cloud ranges are
+// calibrated to the default Greenfield scenario's ~100-end-user baseline.
+export const END_USER_BASELINE = 100;
+
+// The fixed greenfield FTE allocations (platformArchitect, platformEngineer, etc.) are
+// calibrated to a baseline footprint of ~6 microservices / 10 developers / 15 platform users
+// (the default Greenfield scenario). A 1-microservice pilot with one developer doesn't need
+// that same platform team, so labor scales down toward a floor (a minimum viable platform
+// team still exists below which the model doesn't reduce further) and up for larger footprints.
+export const LABOR_FOOTPRINT_BASELINE = { microservices: 6, developers: 10, platformUsers: 15 };
+export const LABOR_FOOTPRINT_MIN = 0.35;
+export const LABOR_FOOTPRINT_MAX = 2.5;
+
 export const MIGRATION_FTE_MONTHS: Record<'Minimal' | 'Simple' | 'Moderate' | 'Complex', RangeValue> = {
   Minimal: { low: 1, expected: 2, high: 4 },
   Simple: { low: 2, expected: 4, high: 8 },
