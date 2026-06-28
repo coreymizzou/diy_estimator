@@ -161,6 +161,18 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
               <NumberInput value={p.numEndUsers} min={0} onChange={e => set('numEndUsers', Number(e.target.value))} />
             </Field>
           </div>
+          <div className="mt-4">
+            <ChoiceGroup
+              label="How many years should this estimate cover?"
+              hint="Stretches build cost over more (or fewer) years of operations cost. Most programs plan in 3-year increments."
+              options={['1 year', '3 years', '5 years'] as const}
+              value={p.analysisPeriod === 'Custom' ? '3 years' : p.analysisPeriod}
+              moderateValue="3 years"
+              onChange={v => set('analysisPeriod', v)}
+              unsure={unsureFields.has('analysisPeriod')}
+              onUnsureChange={v => toggleUnsure('analysisPeriod', v)}
+            />
+          </div>
         </Card>
       )}
 
