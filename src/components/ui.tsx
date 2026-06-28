@@ -28,8 +28,21 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-export function NumberInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <TextInput type="number" {...props} />;
+export function NumberInput({ onChange, min = 0, max, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!onChange) return;
+    const raw = Number(e.target.value);
+    if (Number.isNaN(raw)) return;
+    let clamped = raw;
+    if (min !== undefined && clamped < Number(min)) clamped = Number(min);
+    if (max !== undefined && clamped > Number(max)) clamped = Number(max);
+    if (clamped === raw) {
+      onChange(e);
+    } else {
+      onChange({ ...e, target: { ...e.target, value: String(clamped) } } as React.ChangeEvent<HTMLInputElement>);
+    }
+  };
+  return <TextInput type="number" min={min} max={max} {...props} onChange={handleChange} />;
 }
 
 export function Select({ value, onChange, options, ...rest }: { value: string; onChange: (v: string) => void; options: string[] } & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange'>) {
