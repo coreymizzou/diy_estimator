@@ -1,19 +1,24 @@
 import { useState } from 'react';
-import { Info, FileWarning, RotateCcw, Copy, Plus } from 'lucide-react';
+import { Info, FileWarning, RotateCcw, Copy, Plus, BookOpen } from 'lucide-react';
 import { useScenarioStore } from './lib/useScenarioStore';
 import StepProfile from './components/StepProfile';
 import StepCapability from './components/StepCapability';
 import StepCostAssumptions from './components/StepCostAssumptions';
 import StepResults from './components/StepResults';
 import SummaryPanel from './components/SummaryPanel';
+import GuidedWizard from './components/GuidedWizard';
+import SourcesPage from './components/SourcesPage';
 import { Select, Badge } from './components/ui';
 import type { MaturityPreset } from './data/types';
 
 const STEPS = ['Customer Profile', 'Existing Capability', 'Cost Assumptions', 'Estimate and Findings'];
 
+type Mode = 'guided' | 'advanced' | 'sources';
+
 export default function App() {
   const store = useScenarioStore();
   const [step, setStep] = useState(0);
+  const [mode, setMode] = useState<Mode>('guided');
   const { active } = store;
 
   return (
@@ -53,29 +58,50 @@ export default function App() {
         />
       </div>
 
+      <div className="max-w-7xl mx-auto px-6 mb-2 flex gap-2 no-print">
+        <button onClick={() => setMode('guided')} className={`px-3 py-2 text-sm rounded ${mode === 'guided' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'}`}>Easy mode</button>
+        <button onClick={() => setMode('advanced')} className={`px-3 py-2 text-sm rounded ${mode === 'advanced' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'}`}>Engineer mode</button>
+        <button onClick={() => setMode('sources')} className={`flex items-center gap-1 px-3 py-2 text-sm rounded ml-auto ${mode === 'sources' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'}`}><BookOpen size={14} /> Methodology</button>
+      </div>
+
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-[1fr_280px] gap-6 pb-12">
         <main>
-          <nav className="flex gap-2 mb-4 no-print">
-            {STEPS.map((label, i) => (
-              <button
-                key={label}
-                onClick={() => setStep(i)}
-                className={`px-3 py-2 text-sm rounded ${step === i ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'}`}
-              >
-                {i + 1}. {label}
-              </button>
-            ))}
-          </nav>
+          {mode === 'guided' && (
+            <GuidedWizard
+              scenario={active}
+              onChange={store.updateActive}
+              onApplyPreset={store.applyPreset}
+              onFinish={() => setMode('advanced')}
+            />
+          )}
 
-          {step === 0 && <StepProfile scenario={active} onChange={store.updateActive} />}
-          {step === 1 && <StepCapability scenario={active} onChange={store.updateActive} onApplyPreset={store.applyPreset} />}
-          {step === 2 && <StepCostAssumptions scenario={active} onChange={store.updateActive} />}
-          {step === 3 && <StepResults scenario={active} />}
+          {mode === 'sources' && <SourcesPage />}
 
-          <div className="flex justify-between mt-6 no-print">
-            <button disabled={step === 0} onClick={() => setStep(s => Math.max(0, s - 1))} className="px-4 py-2 text-sm border border-slate-300 rounded disabled:opacity-40">Back</button>
-            <button disabled={step === STEPS.length - 1} onClick={() => setStep(s => Math.min(STEPS.length - 1, s + 1))} className="px-4 py-2 text-sm bg-blue-600 text-white rounded disabled:opacity-40">Next</button>
-          </div>
+          {mode === 'advanced' && (
+            <>
+              <nav className="flex gap-2 mb-4 no-print">
+                {STEPS.map((label, i) => (
+                  <button
+                    key={label}
+                    onClick={() => setStep(i)}
+                    className={`px-3 py-2 text-sm rounded ${step === i ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  >
+                    {i + 1}. {label}
+                  </button>
+                ))}
+              </nav>
+
+              {step === 0 && <StepProfile scenario={active} onChange={store.updateActive} />}
+              {step === 1 && <StepCapability scenario={active} onChange={store.updateActive} onApplyPreset={store.applyPreset} />}
+              {step === 2 && <StepCostAssumptions scenario={active} onChange={store.updateActive} />}
+              {step === 3 && <StepResults scenario={active} />}
+
+              <div className="flex justify-between mt-6 no-print">
+                <button disabled={step === 0} onClick={() => setStep(s => Math.max(0, s - 1))} className="px-4 py-2 text-sm border border-slate-300 rounded disabled:opacity-40">Back</button>
+                <button disabled={step === STEPS.length - 1} onClick={() => setStep(s => Math.min(STEPS.length - 1, s + 1))} className="px-4 py-2 text-sm bg-blue-600 text-white rounded disabled:opacity-40">Next</button>
+              </div>
+            </>
+          )}
 
           <p className="flex items-center gap-1 text-xs text-slate-400 mt-8 no-print">
             <Info size={12} /> All dollar amounts are illustrative planning assumptions. Replace with customer-validated data before use in decision-making.
