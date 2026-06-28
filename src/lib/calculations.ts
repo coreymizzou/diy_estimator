@@ -3,6 +3,7 @@ import type {
 } from '../data/types';
 import { zeroRange } from '../data/types';
 import { LABOR_ROLES } from '../data/types';
+import { DATA_VOLUME_MULTIPLIERS, LOGGING_VOLUME_MULTIPLIERS } from '../data/benchmarks';
 
 export const addRange = (a: RangeValue, b: RangeValue): RangeValue => ({
   low: a.low + b.low,
@@ -89,7 +90,14 @@ export function extendedHoursMultiplier(scenario: Scenario): number {
 }
 
 export function cloudAnnualCost(scenario: Scenario): RangeValue {
-  if (scenario.cloud.mode === 'Quick') return scenario.cloud.quickAnnual;
+  if (scenario.cloud.mode === 'Quick') {
+    // Quick mode is a flat planning range, so data/logging volume are applied here as
+    // multipliers. Advanced mode is already itemized component-by-component, so applying
+    // the same multipliers there would double-count volume effects the user already priced in.
+    const dataFactor = DATA_VOLUME_MULTIPLIERS[scenario.profile.dataVolume];
+    const loggingFactor = LOGGING_VOLUME_MULTIPLIERS[scenario.profile.loggingVolume];
+    return scaleRange(scenario.cloud.quickAnnual, dataFactor * loggingFactor);
+  }
   return scenario.cloud.advancedComponents
     .filter(c => c.included)
     .reduce((acc, c) => addRange(acc, c.recurrence === 'Monthly' ? scaleRange(c.amount, 12) : c.amount), zeroRange());

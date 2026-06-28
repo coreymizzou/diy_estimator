@@ -80,10 +80,10 @@ export default function StepProfile({ scenario, onChange }: { scenario: Scenario
           <Field label="Migration complexity">
             <Select value={p.migrationComplexity} onChange={v => set('migrationComplexity', v as any)} options={['Minimal', 'Simple', 'Moderate', 'Complex']} />
           </Field>
-          <Field label="Data volume">
+          <Field label="Data volume" hint="Scales the Quick-mode cloud cost estimate (storage typically drives 25-40% of cloud spend).">
             <Select value={p.dataVolume} onChange={v => set('dataVolume', v as any)} options={['Low', 'Moderate', 'High', 'Custom']} />
           </Field>
-          <Field label="Logging volume">
+          <Field label="Logging volume" hint="Scales the Quick-mode cloud cost estimate (CloudWatch Logs ingestion/storage typically drives 10-20% of cloud spend).">
             <Select value={p.loggingVolume} onChange={v => set('loggingVolume', v as any)} options={['Low', 'Moderate', 'High', 'Custom']} />
           </Field>
         </div>
