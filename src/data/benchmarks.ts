@@ -119,6 +119,26 @@ export const CLOUD_SOURCES = [
 export const CLOUD_SOURCE_EXPLANATION =
   'Actual GovCloud costs depend on region, architecture, usage, commitment model, data movement, retention, and service configuration.';
 
+// Storage (S3/EBS/RDS) typically represents 25-40% of total AWS cloud spend
+// (industry cost analyses, e.g. nOps and Amnic S3 cost breakdowns). Scaling that
+// share down/up for low vs. high data volume yields a modest swing on total cloud cost.
+export const DATA_VOLUME_MULTIPLIERS: Record<'Low' | 'Moderate' | 'High' | 'Custom', number> = {
+  Low: 0.85,
+  Moderate: 1.0,
+  High: 1.20,
+  Custom: 1.0,
+};
+
+// CloudWatch Logs is billed per GB ingested ($0.50/GB) plus per GB-month archived
+// ($0.03/GB), and observability/logging commonly runs 10-20% of total cloud spend.
+// High-volume logging scales that share up; low-volume scales it down.
+export const LOGGING_VOLUME_MULTIPLIERS: Record<'Low' | 'Moderate' | 'High' | 'Custom', number> = {
+  Low: 0.95,
+  Moderate: 1.0,
+  High: 1.15,
+  Custom: 1.0,
+};
+
 export const TOOLING_PROFILE_RANGES: Record<ToolingProfile, RangeValue> = {
   'Open-source or government-provided': { low: 0, expected: 15000, high: 50000 },
   'Mixed commercial and open-source': { low: 30000, expected: 90000, high: 220000 },
