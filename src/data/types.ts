@@ -46,6 +46,34 @@ export interface RangeValue {
 
 export const zeroRange = (): RangeValue => ({ low: 0, expected: 0, high: 0 });
 
+// PlanningRange/CalculationStep/CostCalculation make every adjustment beyond the base
+// rate x allocation x duration formula an explicit, named, visible step rather than a
+// silent multiplier folded into the result. low/expected/high above map to
+// lower/midpoint/upper case here; the field names stay as-is to avoid a sweeping rename
+// of every call site, but customer-facing copy should say "lower/midpoint/upper planning case."
+export interface PlanningRange {
+  lower: number;
+  midpoint: number;
+  upper: number;
+}
+
+export type CalculationOperation = 'base' | 'multiply' | 'add' | 'subtract' | 'override';
+
+export interface CalculationStep {
+  id: string;
+  label: string;
+  operation: CalculationOperation;
+  value: number;
+  explanation: string;
+  source?: string;
+}
+
+export interface CostCalculation {
+  baseRange: RangeValue;
+  steps: CalculationStep[];
+  finalRange: RangeValue;
+}
+
 export interface CostItem {
   id: string;
   name: string;
@@ -182,7 +210,11 @@ export interface CustomerProfile {
   numDevelopers: number;
   numPlatformUsers: number;
   numEndUsers: number;
-  analysisPeriod: '1 year' | '3 years' | '5 years' | 'Custom';
+  // Implementation period: time to build/migrate/authorize, ending at go-live. Modeled
+  // separately from the operating period below so a 1-year operating-period selection is
+  // never silently treated as also covering the full implementation effort.
+  implementationMonths: 3 | 6 | 9 | 12 | 18 | 24 | number;
+  analysisPeriod: '1 year' | '3 years' | '5 years' | 'Custom'; // operating period after go-live
   customAnalysisYears: number;
   targetOperationalDate: string;
   environments: {

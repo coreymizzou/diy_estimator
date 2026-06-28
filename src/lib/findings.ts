@@ -33,7 +33,7 @@ export function generateFindings(scenario: Scenario, result: EstimateResult): st
     findings.push(`Several existing resources (${unresolvedCapabilities}) have not yet been classified as available or requiring new funding.`);
   }
 
-  findings.push('The estimate should not be treated as decision-ready until cloud usage and labor sourcing are validated.');
+  findings.push('This estimate has not been validated against the customer\'s actual cloud usage and labor sourcing.');
 
   return findings;
 }
@@ -50,7 +50,23 @@ export function topCostDrivers(result: EstimateResult): CostDriver[] {
     .slice(0, 5);
 }
 
-export type ReadinessStatus = 'Exploratory only' | 'Suitable for customer discussion' | 'Ready for formal cost-estimating review';
+export type ReadinessStatus = 'Exploratory only' | 'Suitable for guided customer discussion' | 'Ready to submit for formal cost-estimating review';
+
+// rangeRatio = upper / lower across the headline period total. A ratio this wide means the
+// underlying assumptions disagree enough that the number can't usefully support a decision yet.
+export function rangeRatio(result: EstimateResult): number {
+  const lower = result.periodTotal.low;
+  if (lower <= 0) return Infinity;
+  return result.periodTotal.high / lower;
+}
+
+export type RangeQuality = 'Reasonably bounded' | 'Caution' | 'Too broad for decision support';
+
+export function rangeQuality(ratio: number): RangeQuality {
+  if (ratio <= 2.0) return 'Reasonably bounded';
+  if (ratio <= 3.0) return 'Caution';
+  return 'Too broad for decision support';
+}
 
 export interface ReadinessFlag {
   label: string;
@@ -100,11 +116,12 @@ export function readinessFlags(scenario: Scenario, result: EstimateResult): Read
   return flags;
 }
 
-export function readinessStatus(flags: ReadinessFlag[]): ReadinessStatus {
+export function readinessStatus(flags: ReadinessFlag[], result: EstimateResult): ReadinessStatus {
   const triggeredCount = flags.filter(f => f.triggered).length;
-  if (triggeredCount === 0) return 'Ready for formal cost-estimating review';
-  if (triggeredCount <= 3) return 'Suitable for customer discussion';
-  return 'Exploratory only';
+  const ratio = rangeRatio(result);
+  if (ratio > 3.0 || triggeredCount > 3) return 'Exploratory only';
+  if (triggeredCount === 0 && ratio <= 2.0) return 'Ready to submit for formal cost-estimating review';
+  return 'Suitable for guided customer discussion';
 }
 
 export function overallConfidence(scenario: Scenario): 'High' | 'Medium' | 'Low' {

@@ -1,5 +1,5 @@
 import type {
-  Scenario, RangeValue, LaborAllocation, LaborRoleId, Treatment, CostCategory, CostType,
+  Scenario, RangeValue, LaborAllocation, LaborRoleId, Treatment, CostCategory, CostType, CostCalculation, CalculationStep,
 } from '../data/types';
 import { zeroRange } from '../data/types';
 import { LABOR_ROLES } from '../data/types';
@@ -59,22 +59,62 @@ function blendedAnnualRate(scenario: Scenario, roleId: LaborRoleId): RangeValue 
   };
 }
 
-// Labor cost = annual fully burdened cost x FTE allocation x months assigned / 12
-export function laborAllocationCost(scenario: Scenario, alloc: LaborAllocation): RangeValue {
+// Labor cost = annual fully burdened cost x FTE allocation x months assigned / 12, computed
+// independently for the lower/midpoint/upper planning case. Any adjustment beyond that base
+// formula (footprint scaling, impact-level uplift) is recorded as a named CalculationStep
+// rather than folded silently into the result, so "View calculation" can show exactly what
+// changed the number and why.
+export function laborAllocationCalculation(scenario: Scenario, alloc: LaborAllocation): CostCalculation {
   const annualRate = blendedAnnualRate(scenario, alloc.roleId);
   const months = alloc.monthsAssigned / 12;
-  const cost = {
+  const baseRange: RangeValue = {
     low: annualRate.low * alloc.fteLow * months,
     expected: annualRate.expected * alloc.fteExpected * months,
     high: annualRate.high * alloc.fteHigh * months,
   };
-  const footprintScaled = scaleRange(cost, laborFootprintFactor(scenario));
+
+  const steps: CalculationStep[] = [{
+    id: 'base',
+    label: 'Base labor cost',
+    operation: 'base',
+    value: 0,
+    explanation: `Blended annual rate × FTE allocation × (${alloc.monthsAssigned} months ÷ 12), computed independently for the lower, midpoint, and upper case.`,
+  }];
+
+  const footprintFactor = laborFootprintFactor(scenario);
+  let current = baseRange;
+  if (footprintFactor !== 1) {
+    current = scaleRange(current, footprintFactor);
+    steps.push({
+      id: 'footprint',
+      label: 'Workload-footprint adjustment',
+      operation: 'multiply',
+      value: footprintFactor,
+      explanation: `Scales the fixed-team benchmark to this scenario's microservice/developer/platform-user count relative to the benchmark's calibrated baseline (factor ${footprintFactor.toFixed(2)}x).`,
+    });
+  }
+
   // Higher impact levels require more authorization/control-implementation effort from
   // cybersecurity engineers specifically, not the rest of the team.
   if (alloc.roleId === 'cyberEngineer') {
-    return scaleRange(footprintScaled, CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification]);
+    const classificationFactor = CLASSIFICATION_CYBER_MULTIPLIERS[scenario.profile.classification];
+    if (classificationFactor !== 1) {
+      current = scaleRange(current, classificationFactor);
+      steps.push({
+        id: 'impactLevel',
+        label: 'Impact-level adjustment',
+        operation: 'multiply',
+        value: classificationFactor,
+        explanation: `Impact level ${scenario.profile.classification} requires more NIST 800-53 control implementation/monitoring effort from this role (factor ${classificationFactor.toFixed(2)}x).`,
+      });
+    }
   }
-  return footprintScaled;
+
+  return { baseRange, steps, finalRange: current };
+}
+
+export function laborAllocationCost(scenario: Scenario, alloc: LaborAllocation): RangeValue {
+  return laborAllocationCalculation(scenario, alloc).finalRange;
 }
 
 export interface LaborSummaryRow {
@@ -86,6 +126,9 @@ export interface LaborSummaryRow {
   recurringCostAnnual: RangeValue;
   newCash: RangeValue;
   existingCapacity: RangeValue;
+  // Trace from one representative allocation for this role, illustrating which named
+  // adjustments (if any) were applied on top of the base rate x FTE x months formula.
+  calculationTrace: CalculationStep[];
 }
 
 export function laborSummary(scenario: Scenario): LaborSummaryRow[] {
@@ -103,7 +146,9 @@ export function laborSummary(scenario: Scenario): LaborSummaryRow[] {
     const existingCapacity = allAllocs
       .filter(a => a.treatment === 'Existing funded capacity consumed')
       .reduce((acc, a) => addRange(acc, laborAllocationCost(scenario, a)), zeroRange());
-    return { roleId: role.id, label: role.label, initialFte, recurringFte, initialCost, recurringCostAnnual, newCash, existingCapacity };
+    const representativeAlloc = initialAllocs[0] ?? recurringAllocs[0];
+    const calculationTrace = representativeAlloc ? laborAllocationCalculation(scenario, representativeAlloc).steps : [];
+    return { roleId: role.id, label: role.label, initialFte, recurringFte, initialCost, recurringCostAnnual, newCash, existingCapacity, calculationTrace };
   });
 }
 
@@ -346,5 +391,5 @@ export function formatCurrency(n: number): string {
 }
 
 export function formatRange(r: RangeValue): string {
-  return `${formatCurrency(r.low)} - ${formatCurrency(r.high)} (exp. ${formatCurrency(r.expected)})`;
+  return `${formatCurrency(r.low)} - ${formatCurrency(r.high)} (midpoint ${formatCurrency(r.expected)})`;
 }

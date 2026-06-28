@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, HelpCircle } from 'lucide-react';
 import type { Scenario, MaturityPreset } from '../data/types';
 import { Card, Field, NumberInput } from './ui';
@@ -14,11 +14,8 @@ interface GuidedWizardProps {
 
 const GROUPS = ['Your project', 'Where you are starting from', 'Operations & data', 'Review'];
 
-// "Unsure" answers don't block the estimate — they widen the displayed range instead of guessing
-// silently, so the range stays honest about how much confidence the answers actually support.
-const UNCERTAINTY_STEP = 0.03;
-const UNCERTAINTY_CAP = 0.3;
-
+// "Unsure" answers don't block the estimate, but they are tracked and surfaced as a distinct
+// uncertainty note — never folded into contingency, which stays a separate, opt-in adjustment.
 function ChoiceGroup<T extends string>({
   label, hint, options, value, moderateValue, onChange, unsure, onUnsureChange,
 }: {
@@ -85,22 +82,6 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
     });
   };
 
-  // Widen the contingency band with how many answers are marked "not sure," so the visible
-  // range reflects actual confidence rather than a false-precise number.
-  useEffect(() => {
-    const widen = Math.min(UNCERTAINTY_CAP, unsureFields.size * UNCERTAINTY_STEP);
-    onChange(s => ({
-      ...s,
-      contingency: {
-        ...s.contingency,
-        enabled: true,
-        low: Math.max(s.contingency.low, 0.05 + widen),
-        high: Math.max(s.contingency.high, 0.15 + widen),
-      },
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unsureFields.size]);
-
   const last = step === GROUPS.length - 1;
   const result = computeEstimate(scenario);
 
@@ -131,13 +112,14 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
       </div>
 
       <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
-        <p className="text-xs font-medium text-blue-700 uppercase tracking-wide mb-1">Your estimate so far</p>
+        <p className="text-xs font-medium text-blue-700 uppercase tracking-wide mb-1">Your estimate so far (lower planning case – upper planning case)</p>
         <p className="text-2xl font-semibold text-slate-900">
-          {formatCurrency(result.periodTotalWithContingency.low)} – {formatCurrency(result.periodTotalWithContingency.high)}
+          {formatCurrency(result.periodTotal.low)} – {formatCurrency(result.periodTotal.high)}
         </p>
         <p className="text-xs text-slate-500 mt-1">
-          Total over {result.years} year{result.years > 1 ? 's' : ''}, including build and operations. Updates live as you answer.
-          {unsureFields.size > 0 && ' Range widened because some answers are marked "not sure."'}
+          Total over {result.years} year{result.years > 1 ? 's' : ''}, including build and operations. Updates live as you
+          answer. This does not include contingency, which is a separate, optional adjustment in advanced mode.
+          {unsureFields.size > 0 && ` ${unsureFields.size} answer${unsureFields.size > 1 ? 's are' : ' is'} marked "not sure," which adds uncertainty beyond what this range reflects.`}
         </p>
       </Card>
 
@@ -163,8 +145,20 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
           </div>
           <div className="mt-4">
             <ChoiceGroup
-              label="How many years should this estimate cover?"
-              hint="Stretches build cost over more (or fewer) years of operations cost. Most programs plan in 3-year increments."
+              label="How many months until go-live (implementation period)?"
+              hint="Time to build, migrate, and authorize the platform, ending at go-live. Modeled separately from the operating period below — it is not assumed to be 12 months just because the operating period is in years."
+              options={['3', '6', '9', '12', '18', '24'] as const}
+              value={String(p.implementationMonths) as any}
+              moderateValue={'12' as any}
+              onChange={v => set('implementationMonths', Number(v) as any)}
+              unsure={unsureFields.has('implementationMonths')}
+              onUnsureChange={v => toggleUnsure('implementationMonths', v)}
+            />
+          </div>
+          <div className="mt-4">
+            <ChoiceGroup
+              label="How many years of operations after go-live should this estimate cover?"
+              hint="Operating period after go-live, separate from the implementation period above. Most programs plan in 3-year increments."
               options={['1 year', '3 years', '5 years'] as const}
               value={p.analysisPeriod === 'Custom' ? '3 years' : p.analysisPeriod}
               moderateValue="3 years"
@@ -179,8 +173,8 @@ export default function GuidedWizard({ scenario, onChange, onApplyPreset, onFini
       {step === 1 && (
         <Card title="Where are you starting from?">
           <ChoiceGroup
-            label="Security classification"
-            hint="Higher classifications typically require more cybersecurity engineering and authorization effort."
+            label="Impact level / data sensitivity"
+            hint="Impact level (IL-2/IL-4/IL-5) is a DoD cloud authorization tier, not the same as a formal security classification. Higher impact levels typically require more cybersecurity engineering and authorization effort."
             options={['IL-2', 'IL-4', 'IL-5', 'Other'] as const}
             value={p.classification}
             moderateValue="IL-4"

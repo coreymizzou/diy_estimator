@@ -21,17 +21,23 @@ export default function StepResults({ scenario }: { scenario: Scenario }) {
       <Card title="Primary estimates">
         <div className="grid grid-cols-4 gap-4">
           <div>
-            <p className="text-xs text-slate-500">Initial implementation</p>
+            <p className="text-xs text-slate-500">Total through go-live ({scenario.profile.implementationMonths}-month implementation)</p>
             <p className="text-base font-semibold">{formatRange(result.initialTotal)}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500">Annual recurring</p>
+            <p className="text-xs text-slate-500">Steady-state annual operating (post go-live)</p>
             <p className="text-base font-semibold">{formatRange(result.recurringAnnualTotal)}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500">{result.years}-year total{scenario.contingency.enabled ? ' (with contingency)' : ''}</p>
-            <p className="text-base font-semibold">{formatRange(result.periodTotalWithContingency)}</p>
+            <p className="text-xs text-slate-500">Total through {result.years}-year operating period (base, no contingency)</p>
+            <p className="text-base font-semibold">{formatRange(result.periodTotal)}</p>
           </div>
+          {scenario.contingency.enabled && (
+            <div>
+              <p className="text-xs text-slate-500">{result.years}-year total (with optional contingency)</p>
+              <p className="text-base font-semibold">{formatRange(result.periodTotalWithContingency)}</p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-slate-500">FTE-years (period)</p>
             <p className="text-base font-semibold">{result.fteYearsTotal.low.toFixed(1)} – {result.fteYearsTotal.high.toFixed(1)}</p>
@@ -46,16 +52,16 @@ export default function StepResults({ scenario }: { scenario: Scenario }) {
           </div>
           <div>
             <p className="text-xs text-slate-500">Initial FTE requirement</p>
-            <p className="text-base font-semibold">{result.fteYearsInitial.expected.toFixed(2)} FTE-years (exp.)</p>
+            <p className="text-base font-semibold">{result.fteYearsInitial.expected.toFixed(2)} FTE-years (midpoint)</p>
           </div>
           <div>
             <p className="text-xs text-slate-500">Recurring FTE requirement</p>
-            <p className="text-base font-semibold">{result.fteYearsRecurringAnnual.expected.toFixed(2)} FTE/year (exp.)</p>
+            <p className="text-base font-semibold">{result.fteYearsRecurringAnnual.expected.toFixed(2)} FTE/year (midpoint)</p>
           </div>
         </div>
       </Card>
 
-      <Card title="Breakdown by category (low / expected / high)">
+      <Card title="Breakdown by category (lower / midpoint / upper planning case)">
         <CategoryBarChart data={result.byCategory} />
       </Card>
 
@@ -66,7 +72,7 @@ export default function StepResults({ scenario }: { scenario: Scenario }) {
       <Card title="Top modeled cost drivers">
         <ol className="list-decimal pl-5 space-y-1 text-sm">
           {drivers.map(d => (
-            <li key={d.label}>{d.label}: <strong>{formatCurrency(d.expected)}</strong> expected over the analysis period</li>
+            <li key={d.label}>{d.label}: <strong>{formatCurrency(d.expected)}</strong> planning midpoint over the analysis period</li>
           ))}
         </ol>
       </Card>

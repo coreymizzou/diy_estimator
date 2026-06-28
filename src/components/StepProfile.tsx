@@ -30,7 +30,7 @@ export default function StepProfile({ scenario, onChange }: { scenario: Scenario
           <Field label="Organization">
             <TextInput value={p.organization} onChange={e => set('organization', e.target.value)} />
           </Field>
-          <Field label="Classification or impact level">
+          <Field label="Impact level / data sensitivity" hint="A DoD cloud authorization tier, not a formal security classification.">
             <Select value={p.classification} onChange={v => set('classification', v as any)} options={['IL-2', 'IL-4', 'IL-5', 'Other']} />
           </Field>
           <Field label="Number of applications">
@@ -48,7 +48,10 @@ export default function StepProfile({ scenario, onChange }: { scenario: Scenario
           <Field label="Number of end users">
             <NumberInput value={p.numEndUsers} min={0} onChange={e => set('numEndUsers', Number(e.target.value))} />
           </Field>
-          <Field label="Analysis period">
+          <Field label="Implementation period (months to go-live)" hint="Time to build/migrate/authorize, separate from the operating period below.">
+            <Select value={String(p.implementationMonths)} onChange={v => set('implementationMonths', Number(v) as any)} options={['3', '6', '9', '12', '18', '24']} />
+          </Field>
+          <Field label="Operating period after go-live">
             <Select value={p.analysisPeriod} onChange={v => set('analysisPeriod', v as any)} options={['1 year', '3 years', '5 years', 'Custom']} />
           </Field>
           {p.analysisPeriod === 'Custom' && (

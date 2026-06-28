@@ -21,6 +21,7 @@ export function defaultProfile(): CustomerProfile {
     numDevelopers: 10,
     numPlatformUsers: 15,
     numEndUsers: 100,
+    implementationMonths: 12,
     analysisPeriod: '3 years',
     customAnalysisYears: 3,
     targetOperationalDate: '',
